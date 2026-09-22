@@ -16,7 +16,7 @@ const (
 )
 
 func main() {
-	testInput := ":1000\r\n"
+	testInput := "$11\r\nhello world\r\n"
 	testBytes := []byte(testInput)
 
 	switch testBytes[0] {
@@ -50,6 +50,14 @@ func main() {
 
 	case bulkString:
 		fmt.Println("Bulk string")
+
+		bulkString, err := parseBulkString(testBytes)
+		if err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+		fmt.Println("Bulk String:", bulkString)
+
 	case array:
 		fmt.Println("Array")
 	default:
@@ -74,11 +82,11 @@ func is_CRLF(byteArray []byte, pointer int) bool {
 }
 
 /*
-Finds \r\n and returns the slice of bytes up to (but not including) \r\n
+Finds \r\n and returns the slice of bytes from "start" up to (but not including) \r\n
 For simple strings, simple errors, integers
 */
-func readLine(data []byte) ([]byte, error) {
-	end := 1
+func readLine(data []byte, start int) ([]byte, error) {
+	end := start
 	for end < len(data) && !is_CRLF(data, end) {
 		end += 1
 	}
@@ -88,7 +96,7 @@ func readLine(data []byte) ([]byte, error) {
 		return nil, errors.New("CRLF not included")
 	}
 
-	return data[1:end], nil
+	return data[start:end], nil
 }
 
 func parseSimpleString(data []byte) (string, error) {
@@ -99,7 +107,7 @@ func parseSimpleString(data []byte) (string, error) {
 	}
 
 	// Retrieve command slice
-	slice, err := readLine(data)
+	slice, err := readLine(data, 1)
 	if err != nil {
 		return "", fmt.Errorf("%w\n", err)
 	}
@@ -116,7 +124,7 @@ func parseSimpleError(data []byte) (string, error) {
 	}
 
 	// Retrieve command slice
-	slice, err := readLine(data)
+	slice, err := readLine(data, 1)
 	if err != nil {
 		return "", fmt.Errorf("%w\n", err)
 	}
@@ -133,7 +141,7 @@ func parseInteger(data []byte) (int, error) {
 	}
 
 	// Retrieve command slice
-	slice, err := readLine(data)
+	slice, err := readLine(data, 1)
 	if err != nil {
 		return 0, fmt.Errorf("%w\n", err)
 	}
@@ -145,4 +153,39 @@ func parseInteger(data []byte) (int, error) {
 	}
 
 	return num, nil
+}
+
+func parseBulkString(data []byte) (string, error) {
+
+	// Verify prefix
+	if data[0] != '$' {
+		return "", errors.New("wrong command type")
+	}
+
+	// Retrieve string length and convert to int
+	length, err := readLine(data, 1)
+	if err != nil {
+		return "", fmt.Errorf("%w\n", err)
+	}
+	intLength, err := strconv.Atoi(string(length))
+	if err != nil {
+		return "", fmt.Errorf("%w\n", err)
+	}
+
+	// TODO: Null bulk strings (-1) returns nil instead of ""
+
+	// Calculate where the payload starts and ends
+	bulkStart := 1 + len(length) + 2
+	bulkEnd := bulkStart + intLength
+	if bulkEnd+2 > len(data) {
+		return "", errors.New("incomplete bulk string payload")
+	}
+
+	// Slice the payload directly, and verify CRLF after
+	bulkBytes := data[bulkStart:bulkEnd]
+	if !is_CRLF(data, bulkEnd) {
+		return "", errors.New("missing trailing CSLF after bulk string")
+	}
+
+	return string(bulkBytes), nil
 }
