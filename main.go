@@ -1,7 +1,12 @@
 package main 
 
-import "fmt"
+import (
+	"fmt"
+	"bufio"
+	"os"
+)
 
+// Data types correspond to symbol of first byte
 const (
 	simpleString = "+"
 	simpleError = "-"
@@ -11,5 +16,11 @@ const (
 )
 
 func main() {
-	fmt.Println("Hello World!")
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Println("Enter RESP command: ")
+	if scanner.Scan() {
+		input := scanner.Text() 
+		fmt.Println("Your command is:", input)
+	}
 }
