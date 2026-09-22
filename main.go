@@ -15,7 +15,7 @@ const (
 )
 
 func main() {
-	testInput := "+OK\r\n"
+	testInput := "-Error message\r\n"
 	testBytes := []byte(testInput)
 
 	switch testBytes[0] {
@@ -30,6 +30,13 @@ func main() {
 
 	case simpleError:
 		fmt.Println("Simple error")
+		command, err := parseSimpleError(testBytes)
+		if err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+		fmt.Println("Error:", command)
+
 	case integer:
 		fmt.Println("Integer")
 	case bulkString:
@@ -88,3 +95,21 @@ func parseSimpleString(data []byte) (string, error) {
 	command := string(slice)
 	return command, nil
 }
+
+func parseSimpleError(data []byte) (string, error) {
+
+	// Verify prefix
+	if data[0] != '-' {
+		return "", errors.New("wrong command type")
+	}
+
+	// Retrieve command slice
+	slice, err := readLine(data)
+	if err != nil {
+		return "", fmt.Errorf("%w\n", err)
+	}
+
+	command := string(slice)
+	return command, nil
+}
+
