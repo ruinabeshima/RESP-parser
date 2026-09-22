@@ -8,11 +8,11 @@ import (
 
 // Data types correspond to symbol of first byte
 const (
-	simpleString = "+"
-	simpleError = "-"
-	integer = ":"
-	bulkString = "$"
-	array = "*"
+	simpleString = '+'
+	simpleError = '-'
+	integer = ':'
+	bulkString = '$'
+	array = '*'
 )
 
 func main() {
@@ -21,6 +21,27 @@ func main() {
 	fmt.Println("Enter RESP command: ")
 	if scanner.Scan() {
 		input := scanner.Text() 
+
+		if len(input) == 0 {
+			fmt.Println("Please provide an input")
+			return
+		}
+
+		switch input[0] {
+			case simpleString:
+				fmt.Println("Simple string")
+			case simpleError:
+				fmt.Println("Simple error")
+			case integer: 
+				fmt.Println("Integer")
+			case bulkString:
+				fmt.Println("Bulk string")
+			case array:
+				fmt.Println("Array")
+			default:
+				fmt.Println("Unknown / invalid command")
+		}
+
 		fmt.Println("Your command is:", input)
 	}
 }
