@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Data types correspond to symbol of first byte
 const (
@@ -18,18 +21,12 @@ func main() {
 	switch testBytes[0] {
 	case simpleString:
 		fmt.Println("Simple string")
-
-		if len(testBytes) == 1 {
-			fmt.Println("No command")
+		command, err := parseSimpleString(testBytes)
+		if err != nil {
+			fmt.Println("Error: ", err)
 			return
 		}
-
-		end := 1
-		for end < len(testBytes) && !is_CRLF(testBytes, end) {
-			end += 1
-		}
-		command := string(testBytes[1:end])
-		fmt.Println("Command: ", command)
+		fmt.Println("Command:", command)
 
 	case simpleError:
 		fmt.Println("Simple error")
@@ -58,4 +55,26 @@ func is_CRLF(byteArray []byte, pointer int) bool {
 	}
 
 	return false
+}
+
+func parseSimpleString(data []byte) (string, error) {
+
+	// Verify prefix
+	if data[0] != '+' {
+		return "", errors.New("wrong command type")
+	}
+
+	// Parse command
+	end := 1
+	for end < len(data) && !is_CRLF(data, end) {
+		end += 1
+	}
+
+	// \r\n not included
+	if end == len(data) {
+		return "", errors.New("CRLF not included")
+	}
+
+	command := string(data[1:end])
+	return command, nil
 }
