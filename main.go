@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // Data types correspond to symbol of first byte
@@ -15,7 +16,7 @@ const (
 )
 
 func main() {
-	testInput := "-Error message\r\n"
+	testInput := ":1000\r\n"
 	testBytes := []byte(testInput)
 
 	switch testBytes[0] {
@@ -30,15 +31,23 @@ func main() {
 
 	case simpleError:
 		fmt.Println("Simple error")
-		command, err := parseSimpleError(testBytes)
+		message, err := parseSimpleError(testBytes)
 		if err != nil {
 			fmt.Println("Error: ", err)
 			return
 		}
-		fmt.Println("Error:", command)
+		fmt.Println("Error Message:", message)
 
 	case integer:
 		fmt.Println("Integer")
+
+		num, err := parseInteger(testBytes)
+		if err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+		fmt.Println("Integer:", num)
+
 	case bulkString:
 		fmt.Println("Bulk string")
 	case array:
@@ -64,7 +73,10 @@ func is_CRLF(byteArray []byte, pointer int) bool {
 	return false
 }
 
-// Finds \r\n and returns the slice of bytes up to (but not including) \r\n
+/*
+Finds \r\n and returns the slice of bytes up to (but not including) \r\n
+For simple strings, simple errors, integers
+*/
 func readLine(data []byte) ([]byte, error) {
 	end := 1
 	for end < len(data) && !is_CRLF(data, end) {
@@ -113,3 +125,24 @@ func parseSimpleError(data []byte) (string, error) {
 	return command, nil
 }
 
+func parseInteger(data []byte) (int, error) {
+
+	// Verify prefix
+	if data[0] != ':' {
+		return 0, errors.New("wrong command type")
+	}
+
+	// Retrieve command slice
+	slice, err := readLine(data)
+	if err != nil {
+		return 0, fmt.Errorf("%w\n", err)
+	}
+
+	// Convert bytes to string, then parse to int
+	num, err := strconv.Atoi(string(slice))
+	if err != nil {
+		return 0, fmt.Errorf("%w\n", err)
+	}
+
+	return num, nil
+}
