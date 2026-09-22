@@ -15,19 +15,7 @@ func main() {
 	testInput := "+OK\r\n"
 	testBytes := []byte(testInput)
 
-	// Convert byte stream to string
-	input := ""
-	for i := 0; i < len(testBytes); i++ {
-		char := string(testBytes[i])
-		input += char
-	}
-
-	if len(input) == 0 {
-		fmt.Println("Please provide an input")
-		return
-	}
-
-	switch input[0] {
+	switch testBytes[0] {
 	case simpleString:
 		fmt.Println("Simple string")
 	case simpleError:
@@ -42,7 +30,7 @@ func main() {
 		fmt.Println("Unknown / invalid command")
 	}
 
-	fmt.Println("Your command is:", input)
+	fmt.Println("Your command is:", testBytes)
 }
 
 func is_CRLF(str string, pointer int) bool {
