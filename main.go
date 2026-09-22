@@ -57,14 +57,8 @@ func is_CRLF(byteArray []byte, pointer int) bool {
 	return false
 }
 
-func parseSimpleString(data []byte) (string, error) {
-
-	// Verify prefix
-	if data[0] != '+' {
-		return "", errors.New("wrong command type")
-	}
-
-	// Parse command
+// Finds \r\n and returns the slice of bytes up to (but not including) \r\n
+func readLine(data []byte) ([]byte, error) {
 	end := 1
 	for end < len(data) && !is_CRLF(data, end) {
 		end += 1
@@ -72,9 +66,25 @@ func parseSimpleString(data []byte) (string, error) {
 
 	// \r\n not included
 	if end == len(data) {
-		return "", errors.New("CRLF not included")
+		return nil, errors.New("CRLF not included")
 	}
 
-	command := string(data[1:end])
+	return data[1:end], nil
+}
+
+func parseSimpleString(data []byte) (string, error) {
+
+	// Verify prefix
+	if data[0] != '+' {
+		return "", errors.New("wrong command type")
+	}
+
+	// Retrieve command slice
+	slice, err := readLine(data)
+	if err != nil {
+		return "", fmt.Errorf("%w\n", err)
+	}
+
+	command := string(slice)
 	return command, nil
 }
