@@ -212,4 +212,21 @@ func parseArray(data []byte) (Value, int, error) {
 	if intLength == -1 {
 		return Value{Type: array, isNull: true}, 5, nil
 	}
+
+	// Calculate initial offset
+	offset = 1 + len(length) + 2
+	elements := make([]Value, intLength)
+
+	//　Recursively parse each child element
+	for i := 0; i < intLength; i++ {
+		val, consumed, err := parse(data[offset:])
+		if err != nil {
+			return Value{}, 0, err
+		}
+
+		elements[i] = val
+		offset += consumed
+	}
+
+	return Value{Type: array, Array: elements}, offset, nil
 }
