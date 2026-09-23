@@ -47,8 +47,8 @@ func parse(data []byte) (Value, error) {
 		return Value{Type: integer, Int: num}, err
 
 	case bulkString:
-		bstr, err := parseBulkString(data)
-		return Value{Type: bulkString, Str: bstr}
+		bstr, isNull, err := parseBulkString(data)
+		return Value{Type: bulkString, IsNull: isNull, Str: bstr}
 
 	case array:
 		fmt.Println("Array")
