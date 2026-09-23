@@ -28,30 +28,31 @@ func main() {
 	testBytes := []byte(testInput)
 }
 
-func parse(data []byte) (Value, error) {
+func parse(data []byte) (Value, int, error) {
 	if len(data) == 0 {
 		return Value{}, errors.New("empty payload")
 	}
 
 	switch data[0] {
 	case simpleString:
-		str, err := parseSimpleString(data)
-		return Value{Type: simpleString, Str: str}, err
+		str, consumed, err := parseSimpleString(data)
+		return Value{Type: simpleString, Str: str}, consumed, err
 
 	case simpleError:
-		errStr, err := parseSimpleError(data)
-		return Value{Type: simpleError, Str: errStr}, err
+		errStr, consumed, err := parseSimpleError(data)
+		return Value{Type: simpleError, Str: errStr}, consumed, err
 
 	case integer:
-		num, err := parseInteger(data)
-		return Value{Type: integer, Int: num}, err
+		num, consumed, err := parseInteger(data)
+		return Value{Type: integer, Int: num}, consumed, err
 
 	case bulkString:
-		bstr, isNull, err := parseBulkString(data)
-		return Value{Type: bulkString, IsNull: isNull, Str: bstr}
+		bstr, isNull, consumed, err := parseBulkString(data)
+		return Value{Type: bulkString, IsNull: isNull, Str: bstr}, consumed, err
 
 	case array:
 		fmt.Println("Array")
+
 	default:
 		return Value{}, errors.New("unknown / invalid command")
 	}
@@ -90,121 +91,125 @@ func readLine(data []byte, start int) ([]byte, error) {
 	return data[start:end], nil
 }
 
-func parseSimpleString(data []byte) (string, error) {
+func parseSimpleString(data []byte) (string, int, error) {
 
 	// Verify prefix
 	if data[0] != '+' {
-		return "", errors.New("wrong command type")
+		return "", 0, errors.New("wrong command type")
 	}
 
 	// Retrieve command slice
 	slice, err := readLine(data, 1)
 	if err != nil {
-		return "", fmt.Errorf("%w\n", err)
+		return "", 0, fmt.Errorf("%w\n", err)
 	}
 
-	command := string(slice)
-	return command, nil
+	// Number of bytes processed
+	consumed := 1 + len(slice) + 2
+
+	return string(slice), consumed, nil
 }
 
-func parseSimpleError(data []byte) (string, error) {
+func parseSimpleError(data []byte) (string, int, error) {
 
 	// Verify prefix
 	if data[0] != '-' {
-		return "", errors.New("wrong command type")
+		return "", 0, errors.New("wrong command type")
 	}
 
 	// Retrieve command slice
 	slice, err := readLine(data, 1)
 	if err != nil {
-		return "", fmt.Errorf("%w\n", err)
+		return "", 0, fmt.Errorf("%w\n", err)
 	}
 
-	command := string(slice)
-	return command, nil
+	consumed := 1 + len(slice) + 2
+	return string(slice), consumed, nil
 }
 
-func parseInteger(data []byte) (int, error) {
+// int: Integer, int: number of bytes consumed
+func parseInteger(data []byte) (int, int, error) {
 
 	// Verify prefix
 	if data[0] != ':' {
-		return 0, errors.New("wrong command type")
+		return 0, 0, errors.New("wrong command type")
 	}
 
 	// Retrieve command slice
 	slice, err := readLine(data, 1)
 	if err != nil {
-		return 0, fmt.Errorf("%w\n", err)
+		return 0, 0, fmt.Errorf("%w\n", err)
 	}
 
 	// Convert bytes to string, then parse to int
 	num, err := strconv.Atoi(string(slice))
 	if err != nil {
-		return 0, fmt.Errorf("%w\n", err)
+		return 0, 0, fmt.Errorf("%w\n", err)
 	}
 
-	return num, nil
+	consumed := 1 + len(slice) + 2
+	return num, consumed, nil
 }
 
 // 　Bool return value is for isNull (null bulk string)
-func parseBulkString(data []byte) (string, bool, error) {
+func parseBulkString(data []byte) (string, bool, int, error) {
 
 	// Verify prefix
 	if data[0] != '$' {
-		return "", false, errors.New("wrong command type")
+		return "", false, 0, errors.New("wrong command type")
 	}
 
 	// Retrieve string length and convert to int
 	length, err := readLine(data, 1)
 	if err != nil {
-		return "", false, fmt.Errorf("%w\n", err)
+		return "", false, 0, fmt.Errorf("%w\n", err)
 	}
 	intLength, err := strconv.Atoi(string(length))
 	if err != nil {
-		return "", false, fmt.Errorf("%w\n", err)
+		return "", false, 0, fmt.Errorf("%w\n", err)
 	}
 
 	// Null bulk strings (-1)
 	if intLength == -1 {
-		return "", true, nil
+		return "", true, 5, nil
 	}
 
 	// Calculate where the payload starts and ends
 	bulkStart := 1 + len(length) + 2
 	bulkEnd := bulkStart + intLength
 	if bulkEnd+2 > len(data) {
-		return "", false, errors.New("incomplete bulk string payload")
+		return "", false, 0, errors.New("incomplete bulk string payload")
 	}
 
 	// Slice the payload directly, and verify CRLF after
 	bulkBytes := data[bulkStart:bulkEnd]
 	if !is_CRLF(data, bulkEnd) {
-		return "", false, errors.New("missing trailing CSLF after bulk string")
+		return "", false, 0, errors.New("missing trailing CSLF after bulk string")
 	}
 
-	return string(bulkBytes), nil
+	consumed := 1 + len(length) + 2 + intLength + 2
+	return string(bulkBytes), false, consumed, nil
 }
 
-func parseArray(data []byte) ([]Value, bool, error) {
-	elements := []
+func parseArray(data []byte) (Value, int, error) {
 
-	// Verify prefix 
+	// Verify prefix
 	if data[0] != '*' {
-		return [], false, errors.New("wrong command type")
+		return Value{}, 0, errors.New("wrong command type")
 	}
 
-	// Get length of array 
+	// Get length of array
 	length, err := readLine(data, 1)
 	if err != nil {
-		return [], false, fmt.Errorf("%w\n", err)
+		return Value{}, 0, fmt.Errorf("%w\n", err)
 	}
 	intLength, err := strconv.Atoi(string(length))
 	if err != nil {
-		return [], false, fmt.Errorf("%w\n", err)
+		return Value{}, 0, fmt.Errorf("%w\n", err)
 	}
 
-	// Null array 
-	if intLength == -1 && !is_CRLF(data, len(length) + 1){
-		return [], true, nil 
+	// Null array
+	if intLength == -1 {
+		return Value{Type: array, isNull: true}, 5, nil
 	}
 }
