@@ -15,6 +15,14 @@ const (
 	array        = '*'
 )
 
+type Value struct {
+	Type   byte   // '+', '-', ':', '$', '*'
+	Str    string // Simple string, simple error, bulk string
+	Int    int
+	Array  []Value
+	IsNull bool // Null bulk strings, null array
+}
+
 func main() {
 	testInput := "$11\r\nhello world\r\n"
 	testBytes := []byte(testInput)
