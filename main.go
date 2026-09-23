@@ -24,13 +24,25 @@ type Value struct {
 }
 
 func main() {
-	testInput := "$11\r\nhello world\r\n"
-	testBytes := []byte(testInput)
+	// Array containing: ["SET", "mykey", "hello"]
+    testInput := "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$5\r\nhello\r\n"
+    testBytes := []byte(testInput)
+
+    val, consumed, err := parse(testBytes)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+
+    fmt.Printf("Parsed Array! Consumed %d bytes. Count: %d\n", consumed, len(val.Array))
+    for i, elem := range val.Array {
+        fmt.Printf("  Element %d: %s\n", i, elem.Str)
+    }
 }
 
 func parse(data []byte) (Value, int, error) {
 	if len(data) == 0 {
-		return Value{}, errors.New("empty payload")
+		return Value{}, 0, errors.New("empty payload")
 	}
 
 	switch data[0] {
@@ -51,10 +63,11 @@ func parse(data []byte) (Value, int, error) {
 		return Value{Type: bulkString, IsNull: isNull, Str: bstr}, consumed, err
 
 	case array:
-		fmt.Println("Array")
+		arr, consumed, err := parseArray(data)
+		return arr, consumed, err
 
 	default:
-		return Value{}, errors.New("unknown / invalid command")
+		return Value{}, 0, errors.New("unknown / invalid command")
 	}
 }
 
@@ -210,11 +223,11 @@ func parseArray(data []byte) (Value, int, error) {
 
 	// Null array
 	if intLength == -1 {
-		return Value{Type: array, isNull: true}, 5, nil
+		return Value{Type: array, IsNull: true}, 5, nil
 	}
 
 	// Calculate initial offset
-	offset = 1 + len(length) + 2
+	offset := 1 + len(length) + 2
 	elements := make([]Value, intLength)
 
 	//　Recursively parse each child element
