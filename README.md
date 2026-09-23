@@ -50,7 +50,7 @@ Clone the repository to your local machine:
 
 ```bash
 git clone https://github.com/your-username/resp-parser-go.git
-cd resp-parser-go
+go run main.go
 ```
 
 
