@@ -26,52 +26,35 @@ type Value struct {
 func main() {
 	testInput := "$11\r\nhello world\r\n"
 	testBytes := []byte(testInput)
+}
 
-	switch testBytes[0] {
+func parse(data []byte) (Value, error) {
+	if len(data) == 0 {
+		return Value{}, errors.New("empty payload")
+	}
+
+	switch data[0] {
 	case simpleString:
-		fmt.Println("Simple string")
-		command, err := parseSimpleString(testBytes)
-		if err != nil {
-			fmt.Println("Error: ", err)
-			return
-		}
-		fmt.Println("Command:", command)
+		str, err := parseSimpleString(data)
+		return Value{Type: simpleString, Str: str}, err
 
 	case simpleError:
-		fmt.Println("Simple error")
-		message, err := parseSimpleError(testBytes)
-		if err != nil {
-			fmt.Println("Error: ", err)
-			return
-		}
-		fmt.Println("Error Message:", message)
+		errStr, err := parseSimpleError(data)
+		return Value{Type: simpleError, Str: errStr}, err
 
 	case integer:
-		fmt.Println("Integer")
-
-		num, err := parseInteger(testBytes)
-		if err != nil {
-			fmt.Println("Error: ", err)
-			return
-		}
-		fmt.Println("Integer:", num)
+		num, err := parseInteger(data)
+		return Value{Type: integer, Int: num}, err
 
 	case bulkString:
-		fmt.Println("Bulk string")
-
-		bulkString, err := parseBulkString(testBytes)
-		if err != nil {
-			fmt.Println("Error: ", err)
-			return
-		}
-		fmt.Println("Bulk String:", bulkString)
+		bstr, err := parseBulkString(data)
+		return Value{Type: bulkString, Str: bstr}
 
 	case array:
 		fmt.Println("Array")
 	default:
-		fmt.Println("Unknown / invalid command")
+		return Value{}, errors.New("unknown / invalid command")
 	}
-
 }
 
 func is_CRLF(byteArray []byte, pointer int) bool {
