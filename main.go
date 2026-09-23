@@ -184,3 +184,27 @@ func parseBulkString(data []byte) (string, bool, error) {
 
 	return string(bulkBytes), nil
 }
+
+func parseArray(data []byte) ([]Value, bool, error) {
+	elements := []
+
+	// Verify prefix 
+	if data[0] != '*' {
+		return [], false, errors.New("wrong command type")
+	}
+
+	// Get length of array 
+	length, err := readLine(data, 1)
+	if err != nil {
+		return [], false, fmt.Errorf("%w\n", err)
+	}
+	intLength, err := strconv.Atoi(string(length))
+	if err != nil {
+		return [], false, fmt.Errorf("%w\n", err)
+	}
+
+	// Null array 
+	if intLength == -1 && !is_CRLF(data, len(length) + 1){
+		return [], true, nil 
+	}
+}
