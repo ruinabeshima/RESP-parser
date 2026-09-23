@@ -155,36 +155,40 @@ func parseInteger(data []byte) (int, error) {
 	return num, nil
 }
 
-func parseBulkString(data []byte) (string, error) {
+// 　Bool return value is for isNull (null bulk string)
+func parseBulkString(data []byte) (string, bool, error) {
 
 	// Verify prefix
 	if data[0] != '$' {
-		return "", errors.New("wrong command type")
+		return "", false, errors.New("wrong command type")
 	}
 
 	// Retrieve string length and convert to int
 	length, err := readLine(data, 1)
 	if err != nil {
-		return "", fmt.Errorf("%w\n", err)
+		return "", false, fmt.Errorf("%w\n", err)
 	}
 	intLength, err := strconv.Atoi(string(length))
 	if err != nil {
-		return "", fmt.Errorf("%w\n", err)
+		return "", false, fmt.Errorf("%w\n", err)
 	}
 
-	// TODO: Null bulk strings (-1) returns nil instead of ""
+	// Null bulk strings (-1)
+	if intLength == -1 {
+		return "", true, nil
+	}
 
 	// Calculate where the payload starts and ends
 	bulkStart := 1 + len(length) + 2
 	bulkEnd := bulkStart + intLength
 	if bulkEnd+2 > len(data) {
-		return "", errors.New("incomplete bulk string payload")
+		return "", false, errors.New("incomplete bulk string payload")
 	}
 
 	// Slice the payload directly, and verify CRLF after
 	bulkBytes := data[bulkStart:bulkEnd]
 	if !is_CRLF(data, bulkEnd) {
-		return "", errors.New("missing trailing CSLF after bulk string")
+		return "", false, errors.New("missing trailing CSLF after bulk string")
 	}
 
 	return string(bulkBytes), nil
