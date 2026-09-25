@@ -1,108 +1,15 @@
-package main
+/*
+	Functions to parse each individual data type in RESP2
+	Each function returns the parsed data value, number of bytes processed, and error message if applicable
+*/
+
+package resp
 
 import (
 	"errors"
 	"fmt"
 	"strconv"
 )
-
-// Data types correspond to symbol of first byte
-const (
-	simpleString = '+'
-	simpleError  = '-'
-	integer      = ':'
-	bulkString   = '$'
-	array        = '*'
-)
-
-type Value struct {
-	Type   byte   // '+', '-', ':', '$', '*'
-	Str    string // Simple string, simple error, bulk string
-	Int    int
-	Array  []Value
-	IsNull bool // Null bulk strings, null array
-}
-
-func main() {
-	// Array containing: ["SET", "mykey", "hello"]
-    testInput := "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$5\r\nhello\r\n"
-    testBytes := []byte(testInput)
-
-    val, consumed, err := parse(testBytes)
-    if err != nil {
-        fmt.Println("Error:", err)
-        return
-    }
-
-    fmt.Printf("Parsed Array! Consumed %d bytes. Count: %d\n", consumed, len(val.Array))
-    for i, elem := range val.Array {
-        fmt.Printf("  Element %d: %s\n", i, elem.Str)
-    }
-}
-
-func parse(data []byte) (Value, int, error) {
-	if len(data) == 0 {
-		return Value{}, 0, errors.New("empty payload")
-	}
-
-	switch data[0] {
-	case simpleString:
-		str, consumed, err := parseSimpleString(data)
-		return Value{Type: simpleString, Str: str}, consumed, err
-
-	case simpleError:
-		errStr, consumed, err := parseSimpleError(data)
-		return Value{Type: simpleError, Str: errStr}, consumed, err
-
-	case integer:
-		num, consumed, err := parseInteger(data)
-		return Value{Type: integer, Int: num}, consumed, err
-
-	case bulkString:
-		bstr, isNull, consumed, err := parseBulkString(data)
-		return Value{Type: bulkString, IsNull: isNull, Str: bstr}, consumed, err
-
-	case array:
-		arr, consumed, err := parseArray(data)
-		return arr, consumed, err
-
-	default:
-		return Value{}, 0, errors.New("unknown / invalid command")
-	}
-}
-
-func is_CRLF(byteArray []byte, pointer int) bool {
-
-	// Pointer out of bounds
-	if pointer+1 >= len(byteArray) || pointer < 0 {
-		return false
-	}
-
-	// Check if there is a Carriage Return Line Feed (\r\n)
-	if byteArray[pointer] == '\r' && byteArray[pointer+1] == '\n' {
-		return true
-	}
-
-	return false
-}
-
-/*
-Finds \r\n and returns the slice of bytes from "start" up to (but not including) \r\n
-For simple strings, simple errors, integers
-*/
-func readLine(data []byte, start int) ([]byte, error) {
-	end := start
-	for end < len(data) && !is_CRLF(data, end) {
-		end += 1
-	}
-
-	// \r\n not included
-	if end == len(data) {
-		return nil, errors.New("CRLF not included")
-	}
-
-	return data[start:end], nil
-}
 
 func parseSimpleString(data []byte) (string, int, error) {
 
@@ -191,13 +98,13 @@ func parseBulkString(data []byte) (string, bool, int, error) {
 	bulkStart := 1 + len(length) + 2
 	bulkEnd := bulkStart + intLength
 	if bulkEnd+2 > len(data) {
-		return "", false, 0, errors.New("incomplete bulk string payload")
+		return "", false, 0, ErrIncomplete
 	}
 
 	// Slice the payload directly, and verify CRLF after
 	bulkBytes := data[bulkStart:bulkEnd]
 	if !is_CRLF(data, bulkEnd) {
-		return "", false, 0, errors.New("missing trailing CRLF after bulk string")
+		return "", false, 0, ErrIncomplete
 	}
 
 	consumed := 1 + len(length) + 2 + intLength + 2
@@ -232,7 +139,7 @@ func parseArray(data []byte) (Value, int, error) {
 
 	//　Recursively parse each child element
 	for i := 0; i < intLength; i++ {
-		val, consumed, err := parse(data[offset:])
+		val, consumed, err := Parse(data[offset:])
 		if err != nil {
 			return Value{}, 0, err
 		}
