@@ -1,56 +1,63 @@
 # RESP2 Parser
 
-A lightweight, zero-dependency Go implementation of a **RESP2 (Redis Serialization Protocol)** parser. Built from scratch, and operates directly on raw byte streams using safe slice operations and recursive decoding.
+A small, dependency-free Go package that reads **RESP2** (the wire format Redis uses) from raw bytes and turns it into Go values.
 
-## Features
+Used as the parser in [ruinabeshima/mini-redis](https://github.com/ruinabeshima/mini-redis).
 
-* **Binary-Safe Decoding:** Reads Bulk Strings by byte length rather than scanning line-by-line, preserving raw binary content like images or compressed payloads.
-* **Zero Allocations for Intermediate Parsing:** Employs byte slicing (`[]byte`) to locate bounds before converting into Go primitives.
-* **Recursive Array Handling:** Seamlessly parses nested data structures using byte consumption tracking across elements.
-* **Full RESP2 Specification Support:**
-    - Simple Strings (`+`)
-    - Simple Errors (`-`)
-    - Integers (`:`)
-    - Bulk Strings (`$`), including empty and `nil` (`$-1\r\n`) representations
-    - Arrays (`*`), including recursive/nested arrays and `nil` (`*-1\r\n`) arrays
+## How it works
 
-## Architecture 
+`Parse` looks at the first byte to decide what the message is, hands it to the matching helper, and returns the value plus how many bytes it used.
 
-### The `Value` Type
+```
+ bytes off the connection
+            │
+            ▼
+      Parse(data)  ── looks at data[0]
+            │
+   ┌────────┼──────────────────────────────┐
+   │ '+'  simple string                    │
+   │ '-'  error                            │
+   │ ':'  integer                          │──► (Value, bytesRead, error)
+   │ '$'  bulk string  (read by length)    │
+   │ '*'  array ──┐                        │
+   └──────────────┼────────────────────────┘
+                  │  calls Parse on each element,
+                  └─ adding up bytesRead as it goes
+                        (nested arrays just work)
+```
 
-The `Value` struct serves as a universal container capable of holding any decoded RESP message:
+Every helper returns `bytesRead` so the caller knows where the next message starts in the buffer. If the bytes end mid-message, you get `ErrIncomplete` — read more from the socket and try again.
+
+## The `Value` type
+
+One struct holds any RESP2 message:
 
 ```go
 type Value struct {
-	Type   byte    // Prefix symbol: '+', '-', ':', '$', or '*'
-	Str    string  // Simple Strings, Simple Errors, and Bulk Strings
-	Int    int     // Integers
-	Array  []Value // Nested elements for Array payloads
-	IsNull bool    // Indicates Redis nil values ($-1 or *-1)
+	Type   byte    // '+', '-', ':', '$', or '*'
+	Str    string  // simple strings, errors, bulk strings
+	Int    int     // integers
+	Array  []Value // elements, for arrays
+	IsNull bool    // $-1 or *-1
 }
-
 ```
 
-### Consumption Tracking
+## Supported types
 
-Every parser helper returns three parameters: `(data, consumedBytes, error)`.
+Simple strings (`+`), errors (`-`), integers (`:`), bulk strings (`$`, including empty and null), and arrays (`*`, including nested and null).
 
-When parsing an **Array**, the parser iterates through child items, calling `parse(data[offset:])` recursively and incrementing `offset += consumed` until the expected element count is satisfied. This enables handling deeply nested structures without manual buffer management.
+Bulk strings are read by their declared byte length rather than scanned for a newline, so binary payloads pass through untouched.
 
-
-## Getting Started
-
-### Prerequisites
-
-* **Go:** 1.18 or higher
-
-### Installation
-
-Clone the repository to your local machine:
+## Usage
 
 ```bash
-git clone https://github.com/your-username/resp-parser-go.git
-go run main.go
+go get github.com/ruinabeshima/RESP-parser
 ```
 
+```go
+import "github.com/ruinabeshima/RESP-parser/resp"
 
+val, n, err := resp.Parse(buf)
+```
+
+Requires Go 1.18+.
